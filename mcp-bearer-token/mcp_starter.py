@@ -173,6 +173,54 @@ async def job_finder(
 
 # Image inputs and sending images
 
+SCAN_GROCERY_BILL_DESCRIPTION = RichToolDescription(
+    description="Scan a grocery bill image and extract a list of purchased items using Azure AI Vision OCR.",
+    use_when="Use this tool when the user sends a photo of a grocery bill to extract item names.",
+    side_effects="Returns a list of detected grocery items as text.",
+)
+
+@mcp.tool(description=SCAN_GROCERY_BILL_DESCRIPTION.model_dump_json())
+async def scan_grocery_bill(
+    puch_image_data: Annotated[str, Field(description="Base64-encoded image data of the grocery bill")],
+) -> list[TextContent]:
+    import base64
+    import io
+    from azure.cognitiveservices.vision.computervision import ComputerVisionClient
+    from azure.cognitiveservices.vision.computervision.models import OperationStatusCodes
+    from msrest.authentication import CognitiveServicesCredentials
+    
+    VISION_KEY = os.environ.get("VISION_KEY")
+    VISION_ENDPOINT = os.environ.get("VISION_ENDPOINT")
+    if not VISION_KEY or not VISION_ENDPOINT:
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message="Azure Vision credentials not set in environment."))
+    try:
+        image_bytes = base64.b64decode(puch_image_data)
+        computervision_client = ComputerVisionClient(
+            VISION_ENDPOINT, CognitiveServicesCredentials(VISION_KEY)
+        )
+        image_stream = io.BytesIO(image_bytes)
+        read_response = computervision_client.read_in_stream(image_stream, raw=True)
+        operation_location = read_response.headers["Operation-Location"]
+        operation_id = operation_location.split("/")[-1]
+        import time
+        while True:
+            result = computervision_client.get_read_result(operation_id)
+            if result.status not in ["notStarted", "running"]:
+                break
+            time.sleep(1)
+        if result.status == OperationStatusCodes.succeeded:
+            lines = []
+            for page in result.analyze_result.read_results:
+                for line in page.lines:
+                    lines.append(line.text)
+            # Simple heuristic: filter out lines that look like totals, prices, etc.
+            items = [l for l in lines if l and not any(x in l.lower() for x in ["total", "amount", "price", "rs", "$", "qty", "tax"])]
+            return [TextContent(type="text", text="\n".join(items))]
+        else:
+            raise McpError(ErrorData(code=INTERNAL_ERROR, message="OCR failed to extract text from image."))
+    except Exception as e:
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
+
 MAKE_IMG_BLACK_AND_WHITE_DESCRIPTION = RichToolDescription(
     description="Convert an image to black and white and save it.",
     use_when="Use this tool when the user provides an image URL and requests it to be converted to black and white.",
