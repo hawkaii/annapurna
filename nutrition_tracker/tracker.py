@@ -1,6 +1,6 @@
 import os
 import json
-from typing import Optional, Dict
+from typing import Optional, Dict, List, Any
 import google.generativeai as genai
 from dotenv import load_dotenv
 
@@ -18,7 +18,6 @@ PROMPT_TEMPLATE = (
     "Return calories, protein (g), carbs (g), and fat (g) as numbers in JSON format. "
     "Only return the JSON object."
 )
-
 
 import re
 
@@ -63,4 +62,31 @@ def get_nutrition_from_gemini(food: str, amount: float) -> Optional[Dict[str, fl
         }
     except Exception as e:
         print(f"Error parsing Gemini nutrition response: {e}\nRaw response: {text}")
+        return None
+
+# --- Dish Suggestion via Gemini ---
+def suggest_dishes_from_gemini(ingredients: List[str]) -> Optional[List[str]]:
+    prompt = (
+        "You are a helpful kitchen assistant. Suggest 3 creative, healthy dish names using ONLY these ingredients: "
+        f"{', '.join(ingredients)}. "
+        "Return a JSON array of 3 dish names (strings). Do not include any text or explanation, only the JSON array."
+    )
+    model = genai.GenerativeModel("gemini-2.5-flash")
+    text = None
+    try:
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+        text = text.lstrip("` \n")
+        if text.lower().startswith("json"):
+            text = text[4:].lstrip(" \n")
+        match = re.search(r'\[.*\]', text, re.DOTALL)
+        if not match:
+            raise ValueError("No JSON array found in Gemini response")
+        json_str = match.group(0)
+        data = json.loads(json_str)
+        if not isinstance(data, list) or not all(isinstance(d, str) for d in data):
+            raise ValueError("Response is not a list of strings")
+        return data
+    except Exception as e:
+        print(f"Error parsing Gemini dish suggestion response: {e}\nRaw response: {text}")
         return None

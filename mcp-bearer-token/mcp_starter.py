@@ -19,7 +19,7 @@ from mcp.types import INVALID_PARAMS, INTERNAL_ERROR
 from pydantic import BaseModel, Field
 
 # --- Local Imports ---
-from nutrition_tracker.tracker import get_nutrition_from_gemini
+from nutrition_tracker.tracker import get_nutrition_from_gemini, suggest_dishes_from_gemini
 from datetime import datetime
 
 # --- Load Environment Variables ---
@@ -137,25 +137,128 @@ async def get_nutrition(
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Error logging food to text file: {e}"))
     return nutrition
 
-# --- Nutrition Summary Tool ---
-@mcp.tool(description="Get today's nutrition summary for the user")
-async def nutrition_summary(
+# --- Nutrition Board Tool ---
+NUTRITION_BOARD_DESCRIPTION = RichToolDescription(
+    description="""
+    Returns the user's current nutrition scoreboard (totals) from nutrition_totals.txt.\n
+    Use this to see the running total of calories, protein, carbs, and fat consumed by the user so far.
+    """,
+    use_when="User wants to see their nutrition totals/scoreboard.",
+    side_effects="None. Only reads from nutrition_totals.txt.",
+)
+
+@mcp.tool(description=NUTRITION_BOARD_DESCRIPTION.model_dump_json())
+async def nutrition_board(
     user_id: Annotated[str, Field(description="Unique user identifier")],
-) -> str:
+) -> dict:
+    """
+    Returns the user's current nutrition scoreboard (totals) from nutrition_totals.txt.
+    """
+    import ast
     if not user_id:
-        return "Sorry, we couldn't identify you. Please try again."
-    today = date.today()
+        raise McpError(ErrorData(code=INVALID_PARAMS, message="User ID is required."))
+    if not os.path.exists('nutrition_totals.txt'):
+        return {"user_id": user_id, "calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
+    with open('nutrition_totals.txt', 'r') as f:
+        for line in f:
+            if line.strip():
+                entry = ast.literal_eval(line.strip())
+                if entry['user_id'] == user_id:
+                    return entry
+    return {"user_id": user_id, "calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
+
+# --- Dish Suggestion Tool ---
+SUGGEST_DISHES_DESCRIPTION = RichToolDescription(
+    description="""
+    Suggests 3 creative, healthy dish names using ONLY the provided ingredients.\n
+    Provide a list of ingredients (e.g., ['egg', 'spinach', 'cheese']).\n    The tool will return a JSON array of 3 possible dish names.\n    Powered by Gemini.
+    """,
+    use_when="User wants to know what dishes they can make with available ingredients.",
+    side_effects="None. Only returns dish name suggestions, does not log or store anything.",
+)
+
+@mcp.tool(description=SUGGEST_DISHES_DESCRIPTION.model_dump_json())
+async def suggest_dishes(
+    ingredients: Annotated[list[str], Field(description="List of available ingredients (e.g. ['egg', 'spinach', 'cheese'])")],
+) -> list[str]:
+    """
+    Suggests 3 and dish names using ONLY the provided ingredients, write the quantiy of ingredients used and returned them in a numbered list, via Gemini.
+    """
+    if not ingredients or not isinstance(ingredients, list):
+        raise McpError(ErrorData(code=INVALID_PARAMS, message="Ingredients must be a non-empty list of strings."))
+    dishes = suggest_dishes_from_gemini(ingredients)
+    if not dishes:
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message="Could not get dish suggestions from Gemini."))
+    return dishes
+
+# --- Lock Dish Tool ---
+LOCK_DISH_DESCRIPTION = RichToolDescription(
+    description="""
+    Log a custom dish and its nutrition facts to the nutrition tracker (text file database).\n
+    Provide the user ID, dish name, and a nutrition dictionary (calories, protein, carbs, fat).\n    The tool will append this entry to nutrition_log.txt for the user, with amount=1.\n    This allows custom or suggested dishes to be included in the user's daily nutrition summary.
+    """,
+    use_when="User wants to add a custom or suggested dish to their daily nutrition log.",
+    side_effects="Appends the dish and its nutrition to nutrition_log.txt for the user.",
+)
+
+@mcp.tool(description=LOCK_DISH_DESCRIPTION.model_dump_json())
+async def lock_dish(
+    user_id: Annotated[str, Field(description="Unique user identifier")],
+    dish: Annotated[str, Field(description="Name of the dish to log")],
+    nutrition: Annotated[dict, Field(description="Nutrition facts for the dish (must include: calories, protein, carbs, fat)")],
+) -> dict:
+    """
+    Log a custom dish and its nutrition facts to the nutrition tracker (text file database), and increment the user's nutrition totals in nutrition_totals.txt.
+    """
+    from datetime import datetime
+    import ast
+    required_keys = {"calories", "protein", "carbs", "fat"}
+    if not user_id:
+        raise McpError(ErrorData(code=INVALID_PARAMS, message="User ID is required."))
+    if not dish:
+        raise McpError(ErrorData(code=INVALID_PARAMS, message="Dish name is required."))
+    if not nutrition or not required_keys.issubset(nutrition):
+        raise McpError(ErrorData(code=INVALID_PARAMS, message="Nutrition must include calories, protein, carbs, and fat."))
+    log_entry = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'user_id': user_id,
+        'food': dish,
+        'amount': 1,
+        'nutrition': {k: float(nutrition[k]) for k in required_keys}
+    }
+    # Log to nutrition_log.txt
     try:
-        summary = get_daily_summary(user_id, today)
-        return (
-            f"Today's totals:\n"
-            f"Calories: {summary['calories']}\n"
-            f"Protein: {summary['protein']}g\n"
-            f"Carbs: {summary['carbs']}g\n"
-            f"Fat: {summary['fat']}g"
-        )
+        with open('nutrition_log.txt', 'a') as f:
+            f.write(str(log_entry) + '\n')
     except Exception as e:
-        return f"Sorry, there was an error getting your nutrition summary: {e}"
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Error logging dish to text file: {e}"))
+    # Update nutrition_totals.txt
+    try:
+        totals = {}
+        if os.path.exists('nutrition_totals.txt'):
+            with open('nutrition_totals.txt', 'r') as f:
+                for line in f:
+                    if line.strip():
+                        entry = ast.literal_eval(line.strip())
+                        totals[entry['user_id']] = entry
+        # Increment or create
+        if user_id not in totals:
+            totals[user_id] = {
+                'user_id': user_id,
+                'calories': 0.0,
+                'protein': 0.0,
+                'carbs': 0.0,
+                'fat': 0.0
+            }
+        for k in required_keys:
+            totals[user_id][k] += float(nutrition[k])
+        # Write back all
+        with open('nutrition_totals.txt', 'w') as f:
+            for entry in totals.values():
+                f.write(str(entry) + '\n')
+    except Exception as e:
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Error updating nutrition totals: {e}"))
+    return log_entry
 
 # --- Am I a Hero Tool ---
 AM_I_A_HERO_DESCRIPTION = RichToolDescription(
