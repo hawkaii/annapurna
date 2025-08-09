@@ -1,101 +1,122 @@
-# RannaBondhu WhatsApp Bot – Plan
+# RannaBondhu WhatsApp Bot – Plan (Updated for Gemini Nutrition Extraction)
 
 ## Overview
 
-RannaBondhu is a WhatsApp-based kitchen assistant powered by Puch AI and Gemini. It helps users manage their pantry, scan grocery bills, and get smart recipe suggestions—all through simple image and text interactions.
+RannaBondhu is a WhatsApp-based kitchen assistant powered by Puch AI and Gemini. It helps users manage their pantry, scan grocery bills, get smart recipe suggestions, and now track nutrition—all through simple image and text interactions.
 
 ---
 
 ## Core Features
 
 ### 1. Smart Inventory Scan
-
-#### a. Fridge & Pantry Scan (Image → Ingredient List)
-- **User:** Sends a photo of their fridge or pantry via WhatsApp.
-- **Bot:** 
-  - Receives the image through Puch AI.
-  - Uses Gemini Vision (or a similar API) to detect and classify visible ingredients.
-  - Cleans and deduplicates the ingredient list.
-  - Replies with a simple list of detected ingredients.
-- **Example Output:**  
-  `Okay, I see: Paneer, Tomatoes, Onions, Capsicum, Milk.`
-
-#### b. Grocery Bill Scan (Image → Inventory Update)
-- **User:** Sends a photo of a grocery bill.
-- **Bot:** 
-  - Receives the image.
-  - Uses OCR (Gemini Vision, Google Vision, or Tesseract) to extract text.
-  - Parses item names from the OCR output.
-  - Updates the user’s inventory.
-  - Replies with confirmation of added items.
-- **Example Output:**  
-  `Got it. I've added Ginger-Garlic Paste and Garam Masala to your pantry.`
-
----
+- Fridge & Pantry Scan (Image → Ingredient List)
+- Grocery Bill Scan (Image → Inventory Update)
 
 ### 2. AI-Powered Recipe Suggestion
+- "Cook Now" Menu (Text → Recipe Suggestion)
+- Recipe Card (Static Image)
 
-#### a. "Cook Now" Menu (Text → Recipe Suggestion)
-- **User:** Sends a message like “What can I cook now?”
-- **Bot:** 
-  - Looks up the user’s inventory.
-  - Uses Gemini LLM to suggest a recipe, prioritizing perishable or recently added items.
-  - Replies with a friendly, contextual recipe suggestion.
-- **Example Output:**  
-  `Since you have fresh paneer, how about Paneer Bhurji? It's delicious and only takes about 15 minutes to make.`
-
-#### b. Recipe Card (Static Image)
-- **Bot:** 
-  - Maps the suggested recipe to a pre-selected, high-quality image.
-  - Sends the image as a WhatsApp media message alongside the recipe suggestion.
+### 3. Nutrition Tracker (NEW, via Gemini)
+- Log food via WhatsApp command (e.g., `log apple 2`)
+- Use Gemini (Google Generative AI) to extract nutrition data
+- Store logs per user in SQLite database
+- View daily nutrition summary via WhatsApp (e.g., `summary`)
 
 ---
 
 ## System Architecture
 
-- **Frontend:** WhatsApp (user sends images/text).
-- **Middleware:** Puch AI agent receives and routes messages.
-- **Backend:** Python agent (FastAPI, Flask, or MCP server) with:
+- **Frontend:** WhatsApp (user sends images/text)
+- **Middleware:** Puch AI agent receives and routes messages
+- **Backend:** Python agent (FastAPI/MCP server) with:
   - Image analysis (fridge/pantry scan)
   - OCR (grocery bill scan)
   - Inventory management
+  - Nutrition tracker (Gemini + SQLite)
   - Recipe suggestion (via Gemini)
-- **External APIs:** Gemini Vision/LLM, Google Vision, or Tesseract for OCR.
-- **Data Storage:** In-memory or simple DB for user inventory (demo can be session-based).
-- **Static Assets:** Recipe images stored locally or in cloud storage.
+- **External APIs:**
+  - Gemini Vision/LLM (nutrition, recipes)
+  - Microsoft Azure AI Vision (OCR)
+- **Data Storage:**
+  - SQLite for nutrition logs
+  - In-memory or SQLite for inventory
+- **Static Assets:** Recipe images stored locally or in cloud storage
 
 ---
 
-## Tool API Design
+## Nutrition Tracker API Design
 
-- `scan_fridge_pantry(image: base64) -> List[str]`
-- `scan_grocery_bill(image: base64) -> List[str]`
-- `suggest_recipe(user_id: str) -> {recipe: str, image_url: str}`
-
----
-
-## WhatsApp UX
-
-- **Image Input:** User sends a photo, bot replies with a list.
-- **Text Input:** User asks for a recipe, bot replies with recipe and image.
-- **Inventory Management:** Optionally, user can ask “What’s in my pantry?” or “Remove X from pantry”.
+- `log_food(user_id: str, food: str, amount: float) -> dict`  
+  Prompts Gemini for nutrition facts, stores in DB, returns nutrition info.
+- `get_nutrition_summary(user_id: str, date: str) -> dict`  
+  Returns total nutrition for the user for a given day.
 
 ---
 
-## Demo/Prototype Tips
+## WhatsApp UX (Nutrition)
 
-- Use cloud APIs for best OCR and vision results.
-- Hardcode recipe-to-image mappings for demo.
-- Keep inventory in memory for now; add persistence later if needed.
+- **Log Food:**
+  - User: `log apple 2`
+  - Bot: "Logged 2 apples. Calories: 190, Protein: 0.6g, ..."
+- **View Summary:**
+  - User: `summary`
+  - Bot: "Today: Calories: 1200, Protein: 30g, Carbs: 150g, Fat: 40g"
 
 ---
 
-## Summary Table
+## Implementation Steps
 
-| User Action         | Puch AI Tool         | Gemini Use         | Bot Reply Type         |
-|---------------------|----------------------|--------------------|------------------------|
-| Send fridge photo   | scan_fridge_pantry   | Vision (object)    | Text (ingredient list) |
-| Send bill photo     | scan_grocery_bill    | Vision (OCR)       | Text (added items)     |
-| Ask for recipe      | suggest_recipe       | LLM (text)         | Text + Image           |
+1. **Gemini Integration**
+    - Use `google-generativeai` Python package
+    - Write a prompt template for nutrition extraction
+    - Add Gemini API key to `.env`/`.env.example` if not present
+2. **Core Nutrition Logic**
+    - In `nutrition_tracker/tracker.py`, implement a function to call Gemini and parse nutrition info
+3. **Database**
+    - Store logs in SQLite as before
+4. **REST API Layer**
+    - Create `api_server.py` (FastAPI app)
+    - Expose endpoints for logging food and getting summaries
+5. **WhatsApp Bot Integration**
+    - Update `whatsapp_bot.py` to parse `log` and `summary` commands
+    - Call REST API endpoints from bot
+6. **Testing & Documentation**
+    - Test end-to-end: WhatsApp → API → DB → WhatsApp
+    - Update README and `.env.example` with new config
+
+---
+
+## Example Directory Structure
+
+```
+/ (project root)
+|-- nutrition_tracker/
+|     |-- __init__.py
+|     |-- tracker.py
+|     |-- db.py
+|     |-- models.py
+|-- api_server.py
+|-- whatsapp_bot.py
+|-- plan.md
+|-- .env / .env.example
+|-- ...
+```
+
+---
+
+## Summary Table (Nutrition)
+
+| User Action         | WhatsApp Command | API Endpoint         | DB         | Bot Reply Type         |
+|---------------------|------------------|---------------------|------------|------------------------|
+| Log food            | log apple 2      | /log_food           | SQLite     | Nutrition info         |
+| View summary        | summary          | /nutrition_summary  | SQLite     | Daily totals           |
+
+---
+
+## Notes
+- Nutrition logic is reusable for web/mobile apps via REST API
+- SQLite can be swapped for Postgres/MySQL in production
+- Gemini is used for nutrition extraction (no external food API needed)
+- All credentials/secrets in `.env`/`.env.example`
 
 ---

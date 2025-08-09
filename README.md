@@ -16,6 +16,9 @@ MCP (Model Context Protocol) allows AI assistants like Puch to connect to extern
 ### 🖼️ Image Processing Tool
 - **Convert images to black & white** - Upload any image and get a monochrome version
 
+### 🧾 Grocery Bill OCR Tool
+- **Scan grocery bills for items** - Upload a photo of a grocery bill and extract a list of purchased items using Microsoft Azure AI Vision OCR
+
 ### 🔐 Built-in Authentication
 - Bearer token authentication (required by Puch AI)
 - Validation tool that returns your phone number
@@ -51,11 +54,14 @@ Then edit `.env` and add your details:
 ```env
 AUTH_TOKEN=your_secret_token_here
 MY_NUMBER=919876543210
+VISION_KEY=your_azure_vision_key_here
+VISION_ENDPOINT=your_azure_vision_endpoint_here
 ```
 
 **Important Notes:**
 - `AUTH_TOKEN`: This is your secret token for authentication. Keep it safe!
 - `MY_NUMBER`: Your WhatsApp number in format `{country_code}{number}` (e.g., `919876543210` for +91-9876543210)
+- `VISION_KEY` and `VISION_ENDPOINT`: Required for the grocery bill OCR tool. Get these from your Azure AI Vision resource in the Azure Portal.
 
 ### Step 3: Run the Server
 
@@ -92,6 +98,22 @@ You can also deploy this to services like:
 - Render
 - Heroku
 - DigitalOcean App Platform
+
+## Usage Example: Scan Grocery Bill
+
+You can call the `scan_grocery_bill` tool with a base64-encoded image of a grocery bill. The tool will return a list of detected items (excluding totals, prices, etc.) using Microsoft Azure AI Vision OCR.
+
+**Example tool call:**
+```json
+{
+  "tool": "scan_grocery_bill",
+  "params": {
+    "puch_image_data": "<base64-encoded-image>"
+  }
+}
+```
+
+---
 
 ## How to Connect with Puch AI
 
