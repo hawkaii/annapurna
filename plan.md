@@ -1,0 +1,101 @@
+# RannaBondhu WhatsApp Bot – Plan
+
+## Overview
+
+RannaBondhu is a WhatsApp-based kitchen assistant powered by Puch AI and Gemini. It helps users manage their pantry, scan grocery bills, and get smart recipe suggestions—all through simple image and text interactions.
+
+---
+
+## Core Features
+
+### 1. Smart Inventory Scan
+
+#### a. Fridge & Pantry Scan (Image → Ingredient List)
+- **User:** Sends a photo of their fridge or pantry via WhatsApp.
+- **Bot:** 
+  - Receives the image through Puch AI.
+  - Uses Gemini Vision (or a similar API) to detect and classify visible ingredients.
+  - Cleans and deduplicates the ingredient list.
+  - Replies with a simple list of detected ingredients.
+- **Example Output:**  
+  `Okay, I see: Paneer, Tomatoes, Onions, Capsicum, Milk.`
+
+#### b. Grocery Bill Scan (Image → Inventory Update)
+- **User:** Sends a photo of a grocery bill.
+- **Bot:** 
+  - Receives the image.
+  - Uses OCR (Gemini Vision, Google Vision, or Tesseract) to extract text.
+  - Parses item names from the OCR output.
+  - Updates the user’s inventory.
+  - Replies with confirmation of added items.
+- **Example Output:**  
+  `Got it. I've added Ginger-Garlic Paste and Garam Masala to your pantry.`
+
+---
+
+### 2. AI-Powered Recipe Suggestion
+
+#### a. "Cook Now" Menu (Text → Recipe Suggestion)
+- **User:** Sends a message like “What can I cook now?”
+- **Bot:** 
+  - Looks up the user’s inventory.
+  - Uses Gemini LLM to suggest a recipe, prioritizing perishable or recently added items.
+  - Replies with a friendly, contextual recipe suggestion.
+- **Example Output:**  
+  `Since you have fresh paneer, how about Paneer Bhurji? It's delicious and only takes about 15 minutes to make.`
+
+#### b. Recipe Card (Static Image)
+- **Bot:** 
+  - Maps the suggested recipe to a pre-selected, high-quality image.
+  - Sends the image as a WhatsApp media message alongside the recipe suggestion.
+
+---
+
+## System Architecture
+
+- **Frontend:** WhatsApp (user sends images/text).
+- **Middleware:** Puch AI agent receives and routes messages.
+- **Backend:** Python agent (FastAPI, Flask, or MCP server) with:
+  - Image analysis (fridge/pantry scan)
+  - OCR (grocery bill scan)
+  - Inventory management
+  - Recipe suggestion (via Gemini)
+- **External APIs:** Gemini Vision/LLM, Google Vision, or Tesseract for OCR.
+- **Data Storage:** In-memory or simple DB for user inventory (demo can be session-based).
+- **Static Assets:** Recipe images stored locally or in cloud storage.
+
+---
+
+## Tool API Design
+
+- `scan_fridge_pantry(image: base64) -> List[str]`
+- `scan_grocery_bill(image: base64) -> List[str]`
+- `suggest_recipe(user_id: str) -> {recipe: str, image_url: str}`
+
+---
+
+## WhatsApp UX
+
+- **Image Input:** User sends a photo, bot replies with a list.
+- **Text Input:** User asks for a recipe, bot replies with recipe and image.
+- **Inventory Management:** Optionally, user can ask “What’s in my pantry?” or “Remove X from pantry”.
+
+---
+
+## Demo/Prototype Tips
+
+- Use cloud APIs for best OCR and vision results.
+- Hardcode recipe-to-image mappings for demo.
+- Keep inventory in memory for now; add persistence later if needed.
+
+---
+
+## Summary Table
+
+| User Action         | Puch AI Tool         | Gemini Use         | Bot Reply Type         |
+|---------------------|----------------------|--------------------|------------------------|
+| Send fridge photo   | scan_fridge_pantry   | Vision (object)    | Text (ingredient list) |
+| Send bill photo     | scan_grocery_bill    | Vision (OCR)       | Text (added items)     |
+| Ask for recipe      | suggest_recipe       | LLM (text)         | Text + Image           |
+
+---
