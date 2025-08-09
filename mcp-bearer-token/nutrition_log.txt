@@ -1,0 +1,1 @@
+{'timestamp': '2025-08-09T18:47:21.011624', 'user_id': 'Parthib Mukherjee', 'food': 'apple', 'amount': 2.0, 'nutrition': {'calories': 190.0, 'protein': 1.0, 'carbs': 50.0, 'fat': 0.6}}
