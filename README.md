@@ -72,16 +72,20 @@ graph TB
     INV --> DB
     VAL --> DB
     
-    %% Styling
-    classDef future fill:#f9f9f9,stroke:#999,stroke-dasharray: 5 5
-    classDef external fill:#e1f5fe,stroke:#0277bd
-    classDef core fill:#f3e5f5,stroke:#7b1fa2
-    classDef data fill:#e8f5e8,stroke:#388e3c
+    %% Dark Theme Styling
+    classDef future fill:#2a2a2a,stroke:#888,stroke-width:2px,color:#ccc,stroke-dasharray: 5 5
+    classDef external fill:#1a365d,stroke:#4299e1,stroke-width:2px,color:#90cdf4
+    classDef core fill:#2d3748,stroke:#805ad5,stroke-width:2px,color:#d6bcfa
+    classDef data fill:#1a202c,stroke:#68d391,stroke-width:2px,color:#9ae6b4
+    classDef user fill:#2c5282,stroke:#63b3ed,stroke-width:2px,color:#bee3f8
+    classDef middleware fill:#744210,stroke:#f6ad55,stroke-width:2px,color:#fbd38d
     
     class WEB,MOB,API future
     class AZURE,GEMINI external
     class MCP,OCR,NUT,REC,INV,VAL core
     class DB data
+    class WA user
+    class PUCH middleware
 ```
 
 ### Current Architecture Overview
