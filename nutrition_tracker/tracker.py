@@ -66,6 +66,68 @@ def get_nutrition_from_gemini(food: str, amount: float) -> Optional[Dict[str, fl
         print(f"Error parsing Gemini nutrition response: {e}\nRaw response: {text}")
         return None
 
+# --- Nutrition Totals from DB ---
+from nutrition_tracker.db import AsyncSessionLocal
+from nutrition_tracker.models import User, NutritionLog
+from sqlalchemy import select, func
+from datetime import datetime
+
+async def get_nutrition_totals_from_db(
+    user_id: str, start_date: str = None, end_date: str = None
+) -> list[dict]:
+    """
+    Returns a list of daily nutrition totals for the user from the database.
+    Each item: { "date": "YYYY-MM-DD", "calories": float, "protein": float, "carbs": float, "fat": float }
+    """
+    async with AsyncSessionLocal() as session:
+        # Get user row
+        user = (await session.execute(select(User).where(User.user_id == user_id))).scalar_one_or_none()
+        if not user:
+            return []
+
+        # Build query
+        query = (
+            select(
+                func.date(NutritionLog.timestamp).label("date"),
+                func.sum(NutritionLog.calories).label("calories"),
+                func.sum(NutritionLog.protein).label("protein"),
+                func.sum(NutritionLog.carbs).label("carbs"),
+                func.sum(NutritionLog.fat).label("fat"),
+            )
+            .where(NutritionLog.user_id == user.id)
+        )
+
+        # Date filtering
+        if start_date:
+            try:
+                start = datetime.strptime(start_date, "%Y-%m-%d")
+                query = query.where(NutritionLog.timestamp >= start)
+            except Exception:
+                pass
+        if end_date:
+            try:
+                end = datetime.strptime(end_date, "%Y-%m-%d")
+                # Add 1 day to include the end date fully
+                end = end.replace(hour=23, minute=59, second=59)
+                query = query.where(NutritionLog.timestamp <= end)
+            except Exception:
+                pass
+
+        query = query.group_by(func.date(NutritionLog.timestamp)).order_by(func.date(NutritionLog.timestamp))
+
+        result = await session.execute(query)
+        rows = result.fetchall()
+        return [
+            {
+                "date": str(row.date),
+                "calories": float(row.calories or 0),
+                "protein": float(row.protein or 0),
+                "carbs": float(row.carbs or 0),
+                "fat": float(row.fat or 0),
+            }
+            for row in rows
+        ]
+
 # --- Dish Suggestion via Gemini ---
 def suggest_dishes_from_gemini(ingredients: List[str]) -> Optional[List[str]]:
     prompt = (

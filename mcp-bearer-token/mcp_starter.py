@@ -70,42 +70,6 @@ mcp = FastMCP(
 def validate() -> str:
     return MY_NUMBER
 
-# --- Nutrition Logging Tool (commented out for now) ---
-# LOG_FOOD_DESCRIPTION = RichToolDescription(
-#     description="Log a food and amount for nutrition tracking (uses Gemini for nutrition info).",
-#     use_when="User provides a food and amount to log for nutrition tracking.",
-#     side_effects="Updates the user's nutrition log and returns a nutrition summary for the logged food.",
-# )
-#
-# @mcp.tool(description=LOG_FOOD_DESCRIPTION.model_dump_json())
-# async def log_food(
-#     user_id: Annotated[str, Field(description="Unique user identifier")],
-#     food: Annotated[str, Field(description="Food name, e.g. 'apple'")],
-#     amount: Annotated[float, Field(description="Amount (e.g. 2 for 2 apples or 100 for 100g rice)")]
-# ) -> str:
-#     """
-#     Log a food and amount for nutrition tracking (uses Gemini for nutrition info).
-#     """
-#     # if not user_id:
-#     #     raise McpError(ErrorData(code=INVALID_PARAMS, message="User ID is required."))
-#     # if not food or not isinstance(food, str):
-#     #     raise McpError(ErrorData(code=INVALID_PARAMS, message="Food name is required."))
-#     # if amount is None or not isinstance(amount, (int, float)):
-#     #     raise McpError(ErrorData(code=INVALID_PARAMS, message="Amount must be a number."))
-#
-#     try:
-#         nutrition = get_nutrition_from_gemini(food, amount)
-#         if not nutrition:
-#             return f"Sorry, I couldn't get nutrition info for {amount} {food}."
-#         # db_log_food(user_id, food, amount, nutrition)  # Database logging disabled for testing
-#         return (
-#             f"✅ (Test) Logged {amount} {food}.\n"
-#             f"Calories: {nutrition['calories']}, Protein: {nutrition['protein']}g, "
-#             f"Carbs: {nutrition['carbs']}g, Fat: {nutrition['fat']}g"
-#         )
-#     except Exception as e:
-#         raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Error logging food: {e}"))
-
 # --- Nutrition Details Tool (no DB, just Gemini) ---
 GET_NUTRITION_DESCRIPTION = RichToolDescription(
     description="""
@@ -262,23 +226,23 @@ async def lock_dish(
         await session.commit()
     return log_entry
 
-# --- Am I a Hero Tool ---
-
-AM_I_A_HERO_DESCRIPTION = RichToolDescription(
-    description="Responds 'you are hero' if the user asks 'am I a hero'. Optionally, echoes the user's mobile number if provided.",
-    use_when="User asks if they are a hero. Use the mobile parameter to personalize the response.",
-    side_effects="Returns a positive affirmation if the user asks 'am I a hero', and echoes the mobile number if provided.",
-)
-
-@mcp.tool(description=AM_I_A_HERO_DESCRIPTION.model_dump_json())
-async def am_i_a_hero(
-    question: Annotated[str, Field(description="The user's question")],
-    mobile: Annotated[str, Field(description="The user's mobile number")]
-) -> str:
-    if question.strip().lower() == "am i a hero":
-        return f"you are hero (mobile: {mobile})"
-    return "Ask me if you are a hero!"
-
+# # --- Am I a Hero Tool ---
+#
+# AM_I_A_HERO_DESCRIPTION = RichToolDescription(
+#     description="Responds 'you are hero' if the user asks 'am I a hero'. Optionally, echoes the user's mobile number if provided.",
+#     use_when="User asks if they are a hero. Use the mobile parameter to personalize the response.",
+#     side_effects="Returns a positive affirmation if the user asks 'am I a hero', and echoes the mobile number if provided.",
+# )
+#
+# @mcp.tool(description=AM_I_A_HERO_DESCRIPTION.model_dump_json())
+# async def am_i_a_hero(
+#     question: Annotated[str, Field(description="The user's question")],
+#     mobile: Annotated[str, Field(description="The user's mobile number")]
+# ) -> str:
+#     if question.strip().lower() == "am i a hero":
+#         return f"you are hero (mobile: {mobile})"
+#     return "Ask me if you are a hero!"
+#
 # --- Grocery Bill OCR Tool ---
 SCAN_GROCERY_BILL_DESCRIPTION = RichToolDescription(
     description="Scan a grocery bill image and extract a list of purchased items using Azure AI Vision OCR.",

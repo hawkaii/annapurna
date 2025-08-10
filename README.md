@@ -1,202 +1,294 @@
-# MCP Starter for Puch AI
+# Annapurna Kitchen Assistant (MCP Starter for Puch AI)
 
-This is a starter template for creating your own Model Context Protocol (MCP) server that works with Puch AI. It comes with ready-to-use tools for job searching and image processing.
+Annapurna is a WhatsApp-based kitchen assistant powered by Puch AI and Gemini. It helps users manage their pantry, scan grocery bills, get smart recipe suggestions, and track nutrition—all through simple image and text interactions. This project is a Model Context Protocol (MCP) server starter, ready to connect with Puch AI and extend with your own tools.
 
-## What is MCP?
+---
 
-MCP (Model Context Protocol) allows AI assistants like Puch to connect to external tools and data sources safely. Think of it like giving your AI extra superpowers without compromising security.
+## Features
 
-## What's Included in This Starter?
+- **Grocery Bill OCR**: Scan grocery bills (image upload) and extract purchased items using Azure AI Vision OCR. Inventory is persistent per user in PostgreSQL.
+- **Smart Inventory Management**: Automatically update your pantry/inventory from grocery bills (PostgreSQL-backed).
+- **AI-Powered Recipe Suggestions**: Get creative, healthy dish ideas based on your available ingredients (Gemini-powered).
+- **Nutrition Tracker**: Log foods, extract nutrition facts via Gemini, and view your nutrition scoreboard (calories, protein, carbs, fat) — all data stored in PostgreSQL.
+- **WhatsApp Integration**: Designed for seamless use with Puch AI’s WhatsApp bot.
+- **Bearer Token Authentication**: Secure, Puch-compatible authentication.
+- **PostgreSQL Database**: All user data is stored in a PostgreSQL database for reliability and scalability.
 
-### 🎯 Job Finder Tool
-- **Analyze job descriptions** - Paste any job description and get smart insights
-- **Fetch job postings from URLs** - Give a job posting link and get the full details
-- **Search for jobs** - Use natural language to find relevant job opportunities
+---
 
-### 🖼️ Image Processing Tool
-- **Convert images to black & white** - Upload any image and get a monochrome version
+## Architecture
 
-### 🧾 Grocery Bill OCR Tool
-- **Scan grocery bills for items** - Upload a photo of a grocery bill and extract a list of purchased items using Microsoft Azure AI Vision OCR
-- **Inventory is now persistent**: Detected items are stored per-user in `inventory.txt` (one line per user, as a Python dict).
-
-### 🔐 Built-in Authentication
-- Bearer token authentication (required by Puch AI)
-- Validation tool that returns your phone number
-
-## Quick Setup Guide
-
-### Step 1: Install Dependencies
-
-First, make sure you have Python 3.11 or higher installed. Then:
-
-```bash
-# Create virtual environment
-uv venv
-
-# Install all required packages
-uv sync
-
-# Activate the environment
-source .venv/bin/activate
+```mermaid
+graph TB
+    %% User Interfaces
+    WA[📱 WhatsApp User] 
+    WEB[🌐 Web App<br/><i>Coming Soon</i>]
+    MOB[📱 Mobile App<br/><i>Future</i>]
+    
+    %% Middleware Layer
+    PUCH[🤖 Puch AI Agent<br/>Message Router]
+    
+    %% Backend Services
+    MCP[🔧 MCP Server<br/>FastMCP + Bearer Auth]
+    API[🔌 REST API<br/><i>Future</i>]
+    
+    %% Core Tools
+    subgraph "🛠️ MCP Tools"
+        OCR[📄 Grocery Bill OCR<br/>Azure Vision]
+        NUT[🥗 Nutrition Tracker<br/>Gemini AI]
+        REC[👨‍🍳 Recipe Suggestions<br/>Gemini AI]
+        INV[📦 Inventory Manager]
+        VAL[✅ Validation Tool]
+    end
+    
+    %% External APIs
+    subgraph "🌍 External APIs"
+        AZURE[☁️ Azure AI Vision<br/>OCR Service]
+        GEMINI[🧠 Google Gemini<br/>LLM for Nutrition & Recipes]
+    end
+    
+    %% Database
+    DB[(🗄️ PostgreSQL Database<br/>Users, Nutrition, Inventory)]
+    
+    %% Connections
+    WA --> PUCH
+    WEB -.-> API
+    MOB -.-> API
+    
+    PUCH --> MCP
+    API -.-> MCP
+    
+    MCP --> OCR
+    MCP --> NUT
+    MCP --> REC
+    MCP --> INV
+    MCP --> VAL
+    
+    OCR --> AZURE
+    NUT --> GEMINI
+    REC --> GEMINI
+    
+    NUT --> DB
+    INV --> DB
+    VAL --> DB
+    
+    %% Styling
+    classDef future fill:#f9f9f9,stroke:#999,stroke-dasharray: 5 5
+    classDef external fill:#e1f5fe,stroke:#0277bd
+    classDef core fill:#f3e5f5,stroke:#7b1fa2
+    classDef data fill:#e8f5e8,stroke:#388e3c
+    
+    class WEB,MOB,API future
+    class AZURE,GEMINI external
+    class MCP,OCR,NUT,REC,INV,VAL core
+    class DB data
 ```
 
-### Step 2: Set Up Environment Variables
+### Current Architecture Overview
 
-Create a `.env` file in the project root:
+- **Frontend**: WhatsApp (via Puch AI) | Future: Web & Mobile Apps
+- **Middleware**: Puch AI agent (routes WhatsApp messages to MCP server)
+- **Backend**: Python MCP server with 5 core tools
+  - OCR (Azure Vision for grocery bills)
+  - Nutrition tracking (Gemini AI + PostgreSQL)
+  - Recipe suggestions (Gemini AI)
+  - Inventory management (PostgreSQL)
+  - User validation (required by Puch)
+- **External APIs**: Gemini (Google Generative AI), Azure AI Vision
+- **Data Storage**: PostgreSQL (users, nutrition_log, nutrition_totals, inventory tables)
+
+---
+
+## Quick Start
+
+### 1. Install Dependencies
+
+Requires Python 3.11+ and [uv](https://github.com/astral-sh/uv):
 
 ```bash
-# Copy the example file
+uv venv && uv sync && source .venv/bin/activate
+```
+
+### 2. Set Up PostgreSQL
+
+- Install PostgreSQL and create a database (e.g., `annapurna`):
+  ```bash
+  createdb annapurna
+  ```
+- (Optional) Create a dedicated user and set a password.
+
+### 3. Configure Environment
+
+Copy the example env file and fill in your credentials:
+
+```bash
 cp .env.example .env
 ```
 
-Then edit `.env` and add your details:
+Edit `.env` and set:
 
-```env
+```
 AUTH_TOKEN=your_secret_token_here
 MY_NUMBER=919876543210
 VISION_KEY=your_azure_vision_key_here
 VISION_ENDPOINT=your_azure_vision_endpoint_here
+GEMINI_API_KEY=your_gemini_api_key_here
+DATABASE_URL=postgresql+asyncpg://username:password@localhost:5432/annapurna
 ```
 
-**Important Notes:**
-- `AUTH_TOKEN`: This is your secret token for authentication. Keep it safe!
-- `MY_NUMBER`: Your WhatsApp number in format `{country_code}{number}` (e.g., `919876543210` for +91-9876543210)
-- `VISION_KEY` and `VISION_ENDPOINT`: Required for the grocery bill OCR tool. Get these from your Azure AI Vision resource in the Azure Portal.
+### 4. Run Database Migrations
 
-### Step 3: Run the Server
+```bash
+alembic upgrade head
+```
+
+### 5. Run the MCP Server
 
 ```bash
 cd mcp-bearer-token
 python mcp_starter.py
 ```
 
-You'll see: `🚀 Starting MCP server on http://0.0.0.0:8086`
-
-### Step 4: Make It Public (Required by Puch)
-
-Since Puch needs to access your server over HTTPS, you need to expose your local server:
-
-#### Option A: Using ngrok (Recommended)
-
-1. **Install ngrok:**
-   Download from https://ngrok.com/download
-
-2. **Get your authtoken:**
-   - Go to https://dashboard.ngrok.com/get-started/your-authtoken
-   - Copy your authtoken
-   - Run: `ngrok config add-authtoken YOUR_AUTHTOKEN`
-
-3. **Start the tunnel:**
-   ```bash
-   ngrok http 8086
-   ```
-
-#### Option B: Deploy to Cloud
-
-You can also deploy this to services like:
-- Railway
-- Render
-- Heroku
-- DigitalOcean App Platform
-
-## Usage Example: Scan Grocery Bill
-
-You can call the `scan_grocery_bill` tool with a base64-encoded image of a grocery bill. The tool will return a list of detected items (excluding totals, prices, etc.) using Microsoft Azure AI Vision OCR, and update your persistent inventory in `inventory.txt`.
-
-**Example tool call:**
-```json
-{
-  "tool": "scan_grocery_bill",
-  "params": {
-    "user_id": "your_user_id",
-    "puch_image_data": "<base64-encoded-image>"
-  }
-}
+You should see:
 ```
+🚀 Starting MCP server on http://0.0.0.0:8086
+```
+
+### 6. Expose Your Server (for Puch AI)
+
+- **Recommended:** Use [ngrok](https://ngrok.com/) to tunnel your local server:
+  ```bash
+  ngrok http 8086
+  ```
+- Or deploy to Railway, Render, Heroku, etc.
 
 ---
 
-## How to Connect with Puch AI
+## Usage with Puch AI (WhatsApp)
 
-1. **[Open Puch AI](https://wa.me/+919998881729)** in your browser
-2. **Start a new conversation**
-3. **Use the connect command:**
+1. [Open Puch AI on WhatsApp](https://wa.me/+919998881729)
+2. Start a conversation
+3. Connect your MCP server:
    ```
-   /mcp connect https://your-domain.ngrok.app/mcp your_secret_token_here
+   /mcp connect https://your-ngrok-url.ngrok.app/mcp your_secret_token_here
    ```
-
-### Debug Mode
-
-To get more detailed error messages:
-
-```
-/mcp diagnostics-level debug
-```
-
-## Customizing the Starter
-
-### Adding New Tools
-
-1. **Create a new tool function:**
-```python
-@mcp.tool(description="Your tool description")
-async def your_tool_name(
-    parameter: Annotated[str, Field(description="Parameter description")]
-) -> str:
-    # Your tool logic here
-    return "Tool result"
-```
-
-2. **Add required imports** if needed
-
-### File-Based Persistence Pattern
-- To persist user data, use a text file (e.g., `inventory.txt`, `nutrition_log.txt`).
-- Each line is a Python dict: `{"user_id": ..., "items": [...]}` or similar.
-- Use helper functions to read/update per-user data.
-
-
-## 📚 **Additional Documentation Resources**
-
-### **Official Puch AI MCP Documentation**
-- **Main Documentation**: https://puch.ai/mcp
-- **Protocol Compatibility**: Core MCP specification with Bearer & OAuth support
-- **Command Reference**: Complete MCP command documentation
-- **Server Requirements**: Tool registration, validation, HTTPS requirements
-
-### **Technical Specifications**
-- **JSON-RPC 2.0 Specification**: https://www.jsonrpc.org/specification (for error handling)
-- **MCP Protocol**: Core protocol messages, tool definitions, authentication
-
-### **Supported vs Unsupported Features**
-
-**✓ Supported:**
-- Core protocol messages
-- Tool definitions and calls
-- Authentication (Bearer & OAuth)
-- Error handling
-
-**✗ Not Supported:**
-- Videos extension
-- Resources extension
-- Prompts extension
-
-## Getting Help
-
-- **Join Puch AI Discord:** https://discord.gg/VMCnMvYx
-- **Check Puch AI MCP docs:** https://puch.ai/mcp
-- **Puch WhatsApp Number:** +91 99988 81729
+4. Use commands like `log apple 2`, send a grocery bill photo, or ask for a recipe suggestion.
 
 ---
 
-## Current Progress (August 2025)
-- All core tools are file-based (no SQLite required)
-- Nutrition, inventory, and dish suggestion tools are ready for hackathon/demo use
-- OCR tool updates persistent inventory per user
-- WhatsApp and REST API integration planned (MCP tools ready)
+## Example API Endpoints
 
-**Happy coding! 🚀**
+- `POST /log_food` – Log a food and amount (calls Gemini for nutrition, stores in PostgreSQL)
+- `POST /nutrition_summary` – Get your daily nutrition summary (from PostgreSQL)
 
-Use the hashtag `#BuildWithPuch` in your posts about your MCP!
+---
 
-This starter makes it super easy to create your own MCP server for Puch AI. Just follow the setup steps and you'll be ready to extend Puch with your custom tools!
+## Development & Testing
+
+- No test framework included by default. To add tests, use `pytest`.
+- Linting: Use `ruff` or `flake8` for PEP8 compliance.
+- All secrets/config in `.env` (see `.env.example`).
+- Code style: PEP8, type hints, one import per line, see [AGENTS.md](AGENTS.md) for guidelines.
+- **Database migrations:** Use Alembic for schema changes (`alembic revision --autogenerate -m "message"` and `alembic upgrade head`).
+
+---
+
+## Technical Stack
+
+### Backend
+- **Language**: Python 3.11+
+- **Framework**: FastMCP (Model Context Protocol)
+- **Database**: PostgreSQL with async SQLAlchemy ORM
+- **Migrations**: Alembic
+- **Authentication**: Bearer token with RSA keys
+- **AI Services**: Google Gemini, Azure AI Vision
+
+### Key Dependencies
+- `fastmcp` - MCP server framework
+- `sqlalchemy[asyncio]` - Async ORM
+- `asyncpg` - PostgreSQL async driver
+- `alembic` - Database migrations
+- `google-generativeai` - Gemini AI client
+- `azure-cognitiveservices-vision-computervision` - Azure OCR
+- `pydantic` - Data validation
+- `python-dotenv` - Environment management
+
+### Deployment Options
+- **Development**: Local with ngrok tunneling
+- **Production**: Railway, Render, Heroku, DigitalOcean
+- **Enterprise**: Kubernetes, Docker Swarm
+- **Database**: Managed PostgreSQL (AWS RDS, Google Cloud SQL, etc.)
+
+---
+
+## Roadmap
+
+### ✅ Completed
+- [x] PostgreSQL migration (async SQLAlchemy, Alembic)
+- [x] Core MCP tools (OCR, nutrition, recipes, inventory)
+- [x] WhatsApp integration via Puch AI
+- [x] Bearer token authentication
+- [x] Gemini AI integration for nutrition & recipes
+
+### 🚧 In Progress
+- [ ] Enhanced error handling and logging
+- [ ] Performance optimizations
+- [ ] Comprehensive test suite
+
+### 🔮 Future Plans
+
+#### Phase 1: API & Documentation (Q1 2025)
+- [ ] **REST API**: Complete REST endpoints for all MCP tools
+- [ ] **API Documentation**: OpenAPI/Swagger docs
+- [ ] **Rate limiting**: Implement proper API rate limiting
+- [ ] **Monitoring**: Health checks and metrics endpoints
+
+#### Phase 2: Web Platform (Q2 2025)
+- [ ] **Web Application**: React/Vue.js frontend
+  - User dashboard for nutrition tracking
+  - Recipe discovery and meal planning
+  - Inventory management interface
+  - Grocery bill upload via web
+- [ ] **User Authentication**: OAuth2, JWT tokens
+- [ ] **Multi-user Support**: User roles and permissions
+
+#### Phase 3: Mobile Apps (Q3 2025)
+- [ ] **iOS App**: Native Swift app
+- [ ] **Android App**: Native Kotlin app
+- [ ] **Features**:
+  - Camera integration for grocery bills
+  - Barcode scanning for products
+  - Offline nutrition logging
+  - Push notifications for meal reminders
+
+#### Phase 4: Advanced Features (Q4 2025)
+- [ ] **AI Meal Planning**: Weekly meal plans based on inventory
+- [ ] **Smart Shopping Lists**: Auto-generated based on recipes
+- [ ] **Nutrition Goals**: Personalized targets and progress tracking
+- [ ] **Recipe Sharing**: Community features
+- [ ] **Integration APIs**: Connect with fitness apps, smart scales
+- [ ] **Voice Assistant**: Alexa/Google Home integration
+
+#### Phase 5: Enterprise & Scale (2026+)
+- [ ] **Multi-tenant SaaS**: White-label solutions
+- [ ] **Advanced Analytics**: Nutrition insights and trends
+- [ ] **Dietitian Portal**: Professional nutrition counseling tools
+- [ ] **Enterprise Cafeteria**: Bulk meal planning for organizations
+
+---
+
+## Resources
+
+- [Puch AI MCP Docs](https://puch.ai/mcp)
+- [Puch AI Discord](https://discord.gg/VMCnMvYx)
+- [JSON-RPC 2.0 Spec](https://www.jsonrpc.org/specification)
+
+---
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
+
+---
+
+**Happy coding! 🚀 Use #BuildWithPuch to share your MCP!**
