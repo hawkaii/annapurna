@@ -1,41 +1,20 @@
-from typing import Dict, List
-from datetime import datetime, date
-from .models import get_db_connection
+import os
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.engine.url import URL
+from dotenv import load_dotenv
 
-def log_food(user_id: str, food: str, amount: float, nutrition: Dict[str, float]):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('''
-        INSERT INTO food_log (user_id, food, amount, calories, protein, carbs, fat, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        user_id,
-        food,
-        amount,
-        nutrition["calories"],
-        nutrition["protein"],
-        nutrition["carbs"],
-        nutrition["fat"],
-        datetime.utcnow().isoformat()
-    ))
-    conn.commit()
-    conn.close()
+load_dotenv()
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-def get_daily_summary(user_id: str, for_date: date) -> Dict[str, float]:
-    conn = get_db_connection()
-    cur = conn.cursor()
-    start = datetime.combine(for_date, datetime.min.time()).isoformat()
-    end = datetime.combine(for_date, datetime.max.time()).isoformat()
-    cur.execute('''
-        SELECT SUM(calories) as calories, SUM(protein) as protein, SUM(carbs) as carbs, SUM(fat) as fat
-        FROM food_log
-        WHERE user_id = ? AND timestamp BETWEEN ? AND ?
-    ''', (user_id, start, end))
-    row = cur.fetchone()
-    conn.close()
-    return {
-        "calories": row["calories"] or 0,
-        "protein": row["protein"] or 0,
-        "carbs": row["carbs"] or 0,
-        "fat": row["fat"] or 0,
-    }
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL must be set in your environment or .env file.")
+
+# Create async engine and sessionmaker
+engine = create_async_engine(DATABASE_URL, echo=True, future=True)
+AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+# Dependency for getting a session (for FastAPI or manual use)
+async def get_session() -> AsyncSession:
+    async with AsyncSessionLocal() as session:
+        yield session

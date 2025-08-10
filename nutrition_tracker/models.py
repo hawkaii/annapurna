@@ -1,32 +1,51 @@
-import sqlite3
-from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncAttrs
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import String, Integer, Float, DateTime, ForeignKey, UniqueConstraint
 from datetime import datetime
+from typing import List, Optional
 
-DB_PATH = "nutrition_tracker.sqlite3"
+class Base(AsyncAttrs, DeclarativeBase):
+    pass
 
-def get_db_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+class User(Base):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    # Add more fields as needed
 
-def create_tables():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS food_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL,
-            food TEXT NOT NULL,
-            amount REAL NOT NULL,
-            calories REAL NOT NULL,
-            protein REAL NOT NULL,
-            carbs REAL NOT NULL,
-            fat REAL NOT NULL,
-            timestamp TEXT NOT NULL
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    logs: Mapped[List["NutritionLog"]] = relationship("NutritionLog", back_populates="user")
+    totals: Mapped[Optional["NutritionTotals"]] = relationship("NutritionTotals", back_populates="user", uselist=False)
+    inventory: Mapped[Optional["Inventory"]] = relationship("Inventory", back_populates="user", uselist=False)
 
-# Call this on startup
-create_tables()
+class NutritionLog(Base):
+    __tablename__ = "nutrition_log"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    food: Mapped[str] = mapped_column(String, nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    calories: Mapped[float] = mapped_column(Float, nullable=False)
+    protein: Mapped[float] = mapped_column(Float, nullable=False)
+    carbs: Mapped[float] = mapped_column(Float, nullable=False)
+    fat: Mapped[float] = mapped_column(Float, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship("User", back_populates="logs")
+
+class NutritionTotals(Base):
+    __tablename__ = "nutrition_totals"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    calories: Mapped[float] = mapped_column(Float, default=0.0)
+    protein: Mapped[float] = mapped_column(Float, default=0.0)
+    carbs: Mapped[float] = mapped_column(Float, default=0.0)
+    fat: Mapped[float] = mapped_column(Float, default=0.0)
+
+    user: Mapped["User"] = relationship("User", back_populates="totals")
+
+class Inventory(Base):
+    __tablename__ = "inventory"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    items: Mapped[str] = mapped_column(String, default="[]")  # Store as JSON string
+
+    user: Mapped["User"] = relationship("User", back_populates="inventory")

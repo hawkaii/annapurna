@@ -18,6 +18,7 @@ MCP (Model Context Protocol) allows AI assistants like Puch to connect to extern
 
 ### 🧾 Grocery Bill OCR Tool
 - **Scan grocery bills for items** - Upload a photo of a grocery bill and extract a list of purchased items using Microsoft Azure AI Vision OCR
+- **Inventory is now persistent**: Detected items are stored per-user in `inventory.txt` (one line per user, as a Python dict).
 
 ### 🔐 Built-in Authentication
 - Bearer token authentication (required by Puch AI)
@@ -101,13 +102,14 @@ You can also deploy this to services like:
 
 ## Usage Example: Scan Grocery Bill
 
-You can call the `scan_grocery_bill` tool with a base64-encoded image of a grocery bill. The tool will return a list of detected items (excluding totals, prices, etc.) using Microsoft Azure AI Vision OCR.
+You can call the `scan_grocery_bill` tool with a base64-encoded image of a grocery bill. The tool will return a list of detected items (excluding totals, prices, etc.) using Microsoft Azure AI Vision OCR, and update your persistent inventory in `inventory.txt`.
 
 **Example tool call:**
 ```json
 {
   "tool": "scan_grocery_bill",
   "params": {
+    "user_id": "your_user_id",
     "puch_image_data": "<base64-encoded-image>"
   }
 }
@@ -137,16 +139,21 @@ To get more detailed error messages:
 ### Adding New Tools
 
 1. **Create a new tool function:**
-   ```python
-   @mcp.tool(description="Your tool description")
-   async def your_tool_name(
-       parameter: Annotated[str, Field(description="Parameter description")]
-   ) -> str:
-       # Your tool logic here
-       return "Tool result"
-   ```
+```python
+@mcp.tool(description="Your tool description")
+async def your_tool_name(
+    parameter: Annotated[str, Field(description="Parameter description")]
+) -> str:
+    # Your tool logic here
+    return "Tool result"
+```
 
 2. **Add required imports** if needed
+
+### File-Based Persistence Pattern
+- To persist user data, use a text file (e.g., `inventory.txt`, `nutrition_log.txt`).
+- Each line is a Python dict: `{"user_id": ..., "items": [...]}` or similar.
+- Use helper functions to read/update per-user data.
 
 
 ## 📚 **Additional Documentation Resources**
@@ -181,6 +188,12 @@ To get more detailed error messages:
 - **Puch WhatsApp Number:** +91 99988 81729
 
 ---
+
+## Current Progress (August 2025)
+- All core tools are file-based (no SQLite required)
+- Nutrition, inventory, and dish suggestion tools are ready for hackathon/demo use
+- OCR tool updates persistent inventory per user
+- WhatsApp and REST API integration planned (MCP tools ready)
 
 **Happy coding! 🚀**
 

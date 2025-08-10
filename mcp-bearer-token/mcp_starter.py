@@ -8,6 +8,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 import asyncio
 from typing import Annotated
 from datetime import date
+import ast
+import base64
+import io
+import time
 
 # --- Third-Party Imports ---
 from dotenv import load_dotenv
@@ -17,6 +21,9 @@ from mcp import ErrorData, McpError
 from mcp.server.auth.provider import AccessToken
 from mcp.types import INVALID_PARAMS, INTERNAL_ERROR
 from pydantic import BaseModel, Field
+from azure.cognitiveservices.vision.computervision import ComputerVisionClient
+from azure.cognitiveservices.vision.computervision.models import OperationStatusCodes
+from msrest.authentication import CognitiveServicesCredentials
 
 # --- Local Imports ---
 from nutrition_tracker.tracker import get_nutrition_from_gemini, suggest_dishes_from_gemini
@@ -123,18 +130,7 @@ async def get_nutrition(
     nutrition = get_nutrition_from_gemini(food, amount)
     if not nutrition:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Could not get nutrition info for {amount} {food}."))
-    try:
-        log_entry = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'user_id': user_id,
-            'food': food,
-            'amount': amount,
-            'nutrition': nutrition
-        }
-        with open('nutrition_log.txt', 'a') as f:
-            f.write(str(log_entry) + '\n')
-    except Exception as e:
-        raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Error logging food to text file: {e}"))
+    # Database logging removed as requested
     return nutrition
 
 # --- Nutrition Board Tool ---
@@ -157,15 +153,23 @@ async def nutrition_board(
     import ast
     if not user_id:
         raise McpError(ErrorData(code=INVALID_PARAMS, message="User ID is required."))
-    if not os.path.exists('nutrition_totals.txt'):
-        return {"user_id": user_id, "calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
-    with open('nutrition_totals.txt', 'r') as f:
-        for line in f:
-            if line.strip():
-                entry = ast.literal_eval(line.strip())
-                if entry['user_id'] == user_id:
-                    return entry
-    return {"user_id": user_id, "calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
+    from nutrition_tracker.db import AsyncSessionLocal
+    from nutrition_tracker.models import User, NutritionTotals
+    from sqlalchemy import select
+    async with AsyncSessionLocal() as session:
+        user = (await session.execute(select(User).where(User.user_id == user_id))).scalar_one_or_none()
+        if not user:
+            return {"user_id": user_id, "calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
+        totals = (await session.execute(select(NutritionTotals).where(NutritionTotals.user_id == user.id))).scalar_one_or_none()
+        if not totals:
+            return {"user_id": user_id, "calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
+        return {
+            "user_id": user_id,
+            "calories": totals.calories,
+            "protein": totals.protein,
+            "carbs": totals.carbs,
+            "fat": totals.fat,
+        }
 
 # --- Dish Suggestion Tool ---
 SUGGEST_DISHES_DESCRIPTION = RichToolDescription(
@@ -226,54 +230,144 @@ async def lock_dish(
         'amount': 1,
         'nutrition': {k: float(nutrition[k]) for k in required_keys}
     }
-    # Log to nutrition_log.txt
-    try:
-        with open('nutrition_log.txt', 'a') as f:
-            f.write(str(log_entry) + '\n')
-    except Exception as e:
-        raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Error logging dish to text file: {e}"))
-    # Update nutrition_totals.txt
-    try:
-        totals = {}
-        if os.path.exists('nutrition_totals.txt'):
-            with open('nutrition_totals.txt', 'r') as f:
-                for line in f:
-                    if line.strip():
-                        entry = ast.literal_eval(line.strip())
-                        totals[entry['user_id']] = entry
-        # Increment or create
-        if user_id not in totals:
-            totals[user_id] = {
-                'user_id': user_id,
-                'calories': 0.0,
-                'protein': 0.0,
-                'carbs': 0.0,
-                'fat': 0.0
-            }
-        for k in required_keys:
-            totals[user_id][k] += float(nutrition[k])
-        # Write back all
-        with open('nutrition_totals.txt', 'w') as f:
-            for entry in totals.values():
-                f.write(str(entry) + '\n')
-    except Exception as e:
-        raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Error updating nutrition totals: {e}"))
+    from nutrition_tracker.db import AsyncSessionLocal
+    from nutrition_tracker.models import User, NutritionLog, NutritionTotals
+    from sqlalchemy import select
+    async with AsyncSessionLocal() as session:
+        # Get or create user
+        user = (await session.execute(select(User).where(User.user_id == user_id))).scalar_one_or_none()
+        if not user:
+            user = User(user_id=user_id)
+            session.add(user)
+            await session.flush()
+        # Add nutrition log for dish
+        log = NutritionLog(user_id=user.id, food=dish, amount=1, calories=nutrition['calories'], protein=nutrition['protein'], carbs=nutrition['carbs'], fat=nutrition['fat'])
+        session.add(log)
+        # Update totals
+        totals = (await session.execute(select(NutritionTotals).where(NutritionTotals.user_id == user.id))).scalar_one_or_none()
+        if not totals:
+            totals = NutritionTotals(
+                user_id=user.id,
+                calories=0.0,
+                protein=0.0,
+                carbs=0.0,
+                fat=0.0,
+            )
+            session.add(totals)
+        totals.calories = (totals.calories or 0.0) + nutrition['calories']
+        totals.protein = (totals.protein or 0.0) + nutrition['protein']
+        totals.carbs = (totals.carbs or 0.0) + nutrition['carbs']
+        totals.fat = (totals.fat or 0.0) + nutrition['fat']
+        await session.commit()
     return log_entry
+
+# --- Inventory Utilities (to be replaced with DB) ---
+
+async def read_inventory(user_id: str) -> list:
+    from nutrition_tracker.db import AsyncSessionLocal
+    from nutrition_tracker.models import User, Inventory
+    import json
+    async with AsyncSessionLocal() as session:
+        user = (await session.execute(select(User).where(User.user_id == user_id))).scalar_one_or_none()
+        if not user:
+            return []
+        inv = (await session.execute(select(Inventory).where(Inventory.user_id == user.id))).scalar_one_or_none()
+        if not inv:
+            return []
+        try:
+            return json.loads(inv.items)
+        except Exception:
+            return []
+
+async def write_inventory(user_id: str, items: list):
+    from nutrition_tracker.db import AsyncSessionLocal
+    from nutrition_tracker.models import User, Inventory
+    import json
+    async with AsyncSessionLocal() as session:
+        user = (await session.execute(select(User).where(User.user_id == user_id))).scalar_one_or_none()
+        if not user:
+            user = User(user_id=user_id)
+            session.add(user)
+            await session.flush()
+        inv = (await session.execute(select(Inventory).where(Inventory.user_id == user.id))).scalar_one_or_none()
+        if not inv:
+            inv = Inventory(user_id=user.id, items=json.dumps(items))
+            session.add(inv)
+        else:
+            inv.items = json.dumps(items)
+        await session.commit()
+
 
 # --- Am I a Hero Tool ---
 AM_I_A_HERO_DESCRIPTION = RichToolDescription(
-    description="Responds 'you are hero' if the user asks 'am I a hero'.",
-    use_when="User asks if they are a hero.",
-    side_effects="Returns a positive affirmation if the user asks 'am I a hero'.",
+    description="Responds 'you are hero' if the user asks 'am I a hero'. Optionally, echoes the user's mobile number if provided.",
+    use_when="User asks if they are a hero. Use the mobile parameter to personalize the response.",
+    side_effects="Returns a positive affirmation if the user asks 'am I a hero', and echoes the mobile number if provided.",
 )
 
 @mcp.tool(description=AM_I_A_HERO_DESCRIPTION.model_dump_json())
 async def am_i_a_hero(
-    question: Annotated[str, Field(description="The user's question")]
+    question: Annotated[str, Field(description="The user's question")],
+    mobile: Annotated[str, Field(description="The user's mobile number")]
 ) -> str:
     if question.strip().lower() == "am i a hero":
-        return "you are hero"
+        return f"you are hero (mobile: {mobile})"
     return "Ask me if you are a hero!"
+
+# --- Grocery Bill OCR Tool ---
+SCAN_GROCERY_BILL_DESCRIPTION = RichToolDescription(
+    description="Scan a grocery bill image and extract a list of purchased items using Azure AI Vision OCR.",
+    use_when="Use this tool when the user sends a photo of a grocery bill to extract item names.",
+    side_effects="Updates the user's inventory in inventory.txt and returns a list of detected grocery items as text.",
+)
+
+@mcp.tool(description=SCAN_GROCERY_BILL_DESCRIPTION.model_dump_json())
+async def scan_grocery_bill(
+    user_id: Annotated[str, Field(description="Unique user identifier")],
+    puch_image_data: Annotated[str, Field(description="Base64-encoded image data of the grocery bill")],
+) -> list:
+    import base64
+    import io
+    from azure.cognitiveservices.vision.computervision import ComputerVisionClient
+    from azure.cognitiveservices.vision.computervision.models import OperationStatusCodes
+    from msrest.authentication import CognitiveServicesCredentials
+    import time
+
+    VISION_KEY = os.environ.get("VISION_KEY")
+    VISION_ENDPOINT = os.environ.get("VISION_ENDPOINT")
+    if not VISION_KEY or not VISION_ENDPOINT:
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message="Azure Vision credentials not set in environment."))
+    try:
+        image_bytes = base64.b64decode(puch_image_data)
+        computervision_client = ComputerVisionClient(
+            VISION_ENDPOINT, CognitiveServicesCredentials(VISION_KEY)
+        )
+        image_stream = io.BytesIO(image_bytes)
+        read_response = computervision_client.read_in_stream(image_stream, raw=True)
+        operation_location = read_response.headers["Operation-Location"]
+        operation_id = operation_location.split("/")[-1]
+        while True:
+            result = computervision_client.get_read_result(operation_id)
+            if result.status not in ["notStarted", "running"]:
+                break
+            time.sleep(1)
+        if result.status == OperationStatusCodes.succeeded:
+            lines = []
+            for page in result.analyze_result.read_results:
+                for line in page.lines:
+                    lines.append(line.text)
+            # Simple heuristic: filter out lines that look like totals, prices, etc.
+            items = [l for l in lines if l and not any(x in l.lower() for x in ["total", "amount", "price", "rs", "$", "qty", "tax"])]
+            # Update inventory file
+            current_items = set(await read_inventory(user_id))
+            new_items = [item for item in items if item not in current_items]
+            all_items = list(current_items.union(new_items))
+            await write_inventory(user_id, all_items)
+            return all_items
+        else:
+            raise McpError(ErrorData(code=INTERNAL_ERROR, message="OCR failed to extract text from image."))
+    except Exception as e:
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
 # --- Run MCP Server ---
 async def main():
