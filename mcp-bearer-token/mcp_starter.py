@@ -261,44 +261,8 @@ async def lock_dish(
         await session.commit()
     return log_entry
 
-# --- Inventory Utilities (to be replaced with DB) ---
-
-async def read_inventory(user_id: str) -> list:
-    from nutrition_tracker.db import AsyncSessionLocal
-    from nutrition_tracker.models import User, Inventory
-    import json
-    async with AsyncSessionLocal() as session:
-        user = (await session.execute(select(User).where(User.user_id == user_id))).scalar_one_or_none()
-        if not user:
-            return []
-        inv = (await session.execute(select(Inventory).where(Inventory.user_id == user.id))).scalar_one_or_none()
-        if not inv:
-            return []
-        try:
-            return json.loads(inv.items)
-        except Exception:
-            return []
-
-async def write_inventory(user_id: str, items: list):
-    from nutrition_tracker.db import AsyncSessionLocal
-    from nutrition_tracker.models import User, Inventory
-    import json
-    async with AsyncSessionLocal() as session:
-        user = (await session.execute(select(User).where(User.user_id == user_id))).scalar_one_or_none()
-        if not user:
-            user = User(user_id=user_id)
-            session.add(user)
-            await session.flush()
-        inv = (await session.execute(select(Inventory).where(Inventory.user_id == user.id))).scalar_one_or_none()
-        if not inv:
-            inv = Inventory(user_id=user.id, items=json.dumps(items))
-            session.add(inv)
-        else:
-            inv.items = json.dumps(items)
-        await session.commit()
-
-
 # --- Am I a Hero Tool ---
+
 AM_I_A_HERO_DESCRIPTION = RichToolDescription(
     description="Responds 'you are hero' if the user asks 'am I a hero'. Optionally, echoes the user's mobile number if provided.",
     use_when="User asks if they are a hero. Use the mobile parameter to personalize the response.",
@@ -318,7 +282,7 @@ async def am_i_a_hero(
 SCAN_GROCERY_BILL_DESCRIPTION = RichToolDescription(
     description="Scan a grocery bill image and extract a list of purchased items using Azure AI Vision OCR.",
     use_when="Use this tool when the user sends a photo of a grocery bill to extract item names.",
-    side_effects="Updates the user's inventory in inventory.txt and returns a list of detected grocery items as text.",
+    side_effects="Returns a list of detected grocery items as text.",
 )
 
 @mcp.tool(description=SCAN_GROCERY_BILL_DESCRIPTION.model_dump_json())
@@ -358,12 +322,8 @@ async def scan_grocery_bill(
                     lines.append(line.text)
             # Simple heuristic: filter out lines that look like totals, prices, etc.
             items = [l for l in lines if l and not any(x in l.lower() for x in ["total", "amount", "price", "rs", "$", "qty", "tax"])]
-            # Update inventory file
-            current_items = set(await read_inventory(user_id))
-            new_items = [item for item in items if item not in current_items]
-            all_items = list(current_items.union(new_items))
-            await write_inventory(user_id, all_items)
-            return all_items
+            # Return detected items (no inventory update)
+            return items
         else:
             raise McpError(ErrorData(code=INTERNAL_ERROR, message="OCR failed to extract text from image."))
     except Exception as e:

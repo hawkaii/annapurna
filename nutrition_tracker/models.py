@@ -15,7 +15,6 @@ class User(Base):
 
     logs: Mapped[List["NutritionLog"]] = relationship("NutritionLog", back_populates="user")
     totals: Mapped[Optional["NutritionTotals"]] = relationship("NutritionTotals", back_populates="user", uselist=False)
-    inventory: Mapped[Optional["Inventory"]] = relationship("Inventory", back_populates="user", uselist=False)
 
 class NutritionLog(Base):
     __tablename__ = "nutrition_log"
@@ -42,10 +41,3 @@ class NutritionTotals(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="totals")
 
-class Inventory(Base):
-    __tablename__ = "inventory"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
-    items: Mapped[str] = mapped_column(String, default="[]")  # Store as JSON string
-
-    user: Mapped["User"] = relationship("User", back_populates="inventory")
