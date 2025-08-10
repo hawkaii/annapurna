@@ -57,10 +57,10 @@ def get_nutrition_from_gemini(food: str, amount: float) -> Optional[Dict[str, fl
                 raise ValueError(f"Missing key: {key}")
         # Coerce any None or missing values to 0 as a fallback
         return {
-            "calories": float(data["calories"]) if data["calories"] is not None else 0.0,
-            "protein": float(data["protein"]) if data["protein"] is not None else 0.0,
-            "carbs": float(data["carbs"]) if data["carbs"] is not None else 0.0,
-            "fat": float(data["fat"]) if data["fat"] is not None else 0.0,
+            "calories": float(data["calories"]), 
+            "protein": float(data["protein"]), 
+            "carbs": float(data["carbs"]) ,
+            "fat": float(data["fat"]), 
         }
     except Exception as e:
         print(f"Error parsing Gemini nutrition response: {e}\nRaw response: {text}")
@@ -73,7 +73,7 @@ def suggest_dishes_from_gemini(ingredients: List[str]) -> Optional[List[str]]:
         f"{', '.join(ingredients)}. "
         "Return a JSON array of 3 dish names (strings). Do not include any text or explanation, only the JSON array."
     )
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    model = genai.GenerativeModel("gemini-2.0-flash")
     text = None
     try:
         response = model.generate_content(prompt)
