@@ -16,6 +16,7 @@ genai.configure(api_key=GEMINI_API_KEY)
 PROMPT_TEMPLATE = (
     "Give me the nutrition facts for {amount} {food}. "
     "Return calories, protein (g), carbs (g), and fat (g) as numbers in JSON format. "
+    "If you cannot determine a value for any field, return 0 for that field (do not use null, empty, or omit the field). "
     "Only return the JSON object."
 )
 
@@ -54,11 +55,12 @@ def get_nutrition_from_gemini(food: str, amount: float) -> Optional[Dict[str, fl
         for key in ("calories", "protein", "carbs", "fat"):
             if key not in data:
                 raise ValueError(f"Missing key: {key}")
+        # Coerce any None or missing values to 0 as a fallback
         return {
-            "calories": float(data["calories"]),
-            "protein": float(data["protein"]),
-            "carbs": float(data["carbs"]),
-            "fat": float(data["fat"]),
+            "calories": float(data["calories"]) if data["calories"] is not None else 0.0,
+            "protein": float(data["protein"]) if data["protein"] is not None else 0.0,
+            "carbs": float(data["carbs"]) if data["carbs"] is not None else 0.0,
+            "fat": float(data["fat"]) if data["fat"] is not None else 0.0,
         }
     except Exception as e:
         print(f"Error parsing Gemini nutrition response: {e}\nRaw response: {text}")

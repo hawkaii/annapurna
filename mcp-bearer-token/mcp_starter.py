@@ -128,8 +128,9 @@ async def get_nutrition(
     if not user_id:
         raise McpError(ErrorData(code=INVALID_PARAMS, message="User ID is required."))
     nutrition = get_nutrition_from_gemini(food, amount)
-    if not nutrition:
-        raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Could not get nutrition info for {amount} {food}."))
+    required_keys = ["calories", "protein", "carbs", "fat"]
+    if not nutrition or any(nutrition.get(k) is None for k in required_keys):
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Could not get nutrition info for {amount} {food}. Please try a different food or amount."))
     # Database logging removed as requested
     return nutrition
 
@@ -221,8 +222,8 @@ async def lock_dish(
         raise McpError(ErrorData(code=INVALID_PARAMS, message="User ID is required."))
     if not dish:
         raise McpError(ErrorData(code=INVALID_PARAMS, message="Dish name is required."))
-    if not nutrition or not required_keys.issubset(nutrition):
-        raise McpError(ErrorData(code=INVALID_PARAMS, message="Nutrition must include calories, protein, carbs, and fat."))
+    if not nutrition or not required_keys.issubset(nutrition) or any(nutrition[k] is None for k in required_keys):
+        raise McpError(ErrorData(code=INVALID_PARAMS, message="Nutrition must include valid calories, protein, carbs, and fat (not None)."))
     log_entry = {
         'timestamp': datetime.utcnow().isoformat(),
         'user_id': user_id,
