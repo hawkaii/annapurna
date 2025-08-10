@@ -1,0 +1,12 @@
+# Dockerfile for PostgreSQL-only service
+FROM postgres:16
+
+# Set environment variables (override in docker-compose or at runtime)
+ENV POSTGRES_USER=puchuser
+ENV POSTGRES_PASSWORD=puchpass
+ENV POSTGRES_DB=puchdb
+
+# Expose PostgreSQL port
+EXPOSE 5432
+
+# No custom entrypoint needed; use default

@@ -1,0 +1,12 @@
+{'timestamp': '2025-08-09T18:47:21.011624', 'user_id': 'Parthib Mukherjee', 'food': 'apple', 'amount': 2.0, 'nutrition': {'calories': 190.0, 'protein': 1.0, 'carbs': 50.0, 'fat': 0.6}}
+{'timestamp': '2025-08-09T19:11:15.154545', 'user_id': 'Parthib Mukherjee', 'food': 'Cheesy beef and spinach sourdough melt', 'amount': 1.0, 'nutrition': {'calories': 725.0, 'protein': 44.0, 'carbs': 59.0, 'fat': 34.0}}
+{'timestamp': '2025-08-09T19:16:04.799560', 'user_id': 'Parthib Mukherjee', 'food': 'Cheesy Beef and Spinach Sourdough Melt', 'amount': 1.0, 'nutrition': {'calories': 750.0, 'protein': 52.0, 'carbs': 38.0, 'fat': 44.0}}
+{'timestamp': '2025-08-09T19:17:13.535096', 'user_id': 'Parthib Mukherjee', 'food': 'Beef and Tomato Sourdough Pizza', 'amount': 1.0, 'nutrition': {'calories': 650.0, 'protein': 35.0, 'carbs': 70.0, 'fat': 32.0}}
+{'timestamp': '2025-08-09T19:29:18.810706', 'user_id': 'Parthib Mukherjee', 'food': 'Beef and Tomato Sourdough Pizza', 'amount': 1, 'nutrition': {'protein': 35.0, 'calories': 650.0, 'carbs': 70.0, 'fat': 32.0}}
+{'timestamp': '2025-08-09T19:38:56.837391', 'user_id': 'Parthib Mukherjee', 'food': 'Sunrise Berry Oat Bliss', 'amount': 1.0, 'nutrition': {'calories': 350.0, 'protein': 12.0, 'carbs': 55.0, 'fat': 10.0}}
+{'timestamp': '2025-08-09T19:39:49.526615', 'user_id': 'Parthib Mukherjee', 'food': 'Sunrise Berry Oat Bliss', 'amount': 1, 'nutrition': {'calories': 350.0, 'protein': 12.0, 'carbs': 55.0, 'fat': 10.0}}
+{'timestamp': '2025-08-09T19:45:11.606697', 'user_id': 'Parthib Mukherjee', 'food': 'Blueberry Date Oat Nectar', 'amount': 1, 'nutrition': {'calories': 0.0, 'protein': 0.0, 'carbs': 0.0, 'fat': 0.0}}
+{'timestamp': '2025-08-09T19:48:10.307450', 'user_id': 'Parthib Mukherjee', 'food': 'Blueberries date oat nector', 'amount': 1.0, 'nutrition': {'calories': 235.0, 'protein': 3.0, 'carbs': 55.0, 'fat': 4.0}}
+{'timestamp': '2025-08-09T19:48:53.952418', 'user_id': 'Parthib Mukherjee', 'food': 'Blueberries date oat nector', 'amount': 1, 'nutrition': {'calories': 235.0, 'protein': 3.0, 'carbs': 55.0, 'fat': 4.0}}
+{'timestamp': '2025-08-09T20:02:01.570570', 'user_id': 'Parthib Mukherjee', 'food': 'Espresso Banana Dream Toast', 'amount': 1.0, 'nutrition': {'calories': 340.0, 'protein': 12.5, 'carbs': 38.0, 'fat': 17.7}}
+{'timestamp': '2025-08-09T20:02:52.946229', 'user_id': 'Parthib Mukherjee', 'food': 'Espresso Banana Dream Toast', 'amount': 1, 'nutrition': {'carbs': 38.0, 'protein': 12.5, 'fat': 17.7, 'calories': 340.0}}

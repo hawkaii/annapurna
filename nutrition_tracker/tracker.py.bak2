@@ -1,0 +1,53 @@
+import os
+import json
+from typing import Optional, Dict
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+load_dotenv()
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if not GEMINI_API_KEY:
+    raise RuntimeError("GEMINI_API_KEY not set in environment.")
+
+genai.configure(api_key=GEMINI_API_KEY)
+
+PROMPT_TEMPLATE = (
+    "Give me the nutrition facts for {amount} {food}. "
+    "Return calories, protein (g), carbs (g), and fat (g) as numbers in JSON format. "
+    "Only return the JSON object."
+)
+
+def get_nutrition_from_gemini(food: str, amount: float) -> Optional[Dict[str, float]]:
+    prompt = PROMPT_TEMPLATE.format(food=food, amount=amount)
+    model = genai.GenerativeModel("gemini-2.5-flash")
+    response = model.generate_content(prompt)
+    try:
+        # Remove code block markers and leading 'json'
+        text = text.lstrip("` \n")
+        if text.lower().startswith("json"):
+            text = text[4:].lstrip(" \n")
+        data = json.loads(text)
+        # Normalize keys
+        key_map = {
+            "protein (g)": "protein",
+            "carbs (g)": "carbs",
+            "fat (g)": "fat",
+        }
+        for old, new in key_map.items():
+            if old in data:
+                data[new] = data.pop(old)
+        # Ensure all required keys are present
+        for key in ("calories", "protein", "carbs", "fat"):
+            if key not in data:
+                raise ValueError(f"Missing key: {key}")
+        return {
+            "calories": float(data["calories"]),
+            "protein": float(data["protein"]),
+            "carbs": float(data["carbs"]),
+            "fat": float(data["fat"]),
+        }
+    except Exception as e:
+        print(f"Error parsing Gemini nutrition response: {e}\nRaw response: {text}")
+        return None

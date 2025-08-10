@@ -1,0 +1,1 @@
+{'user_id': 'Parthib Mukherjee', 'calories': 925.0, 'protein': 27.5, 'carbs': 148.0, 'fat': 31.7}
