@@ -1,4 +1,20 @@
+
+
 # Annapurna Kitchen Assistant (MCP Starter for Puch AI)
+<div align="center">
+
+<a href="https://tinyurl.com/annapurna-bot" style="text-decoration:none;">
+  <img src="https://img.shields.io/badge/Chat%20on%20WhatsApp-25D366?style=for-the-badge&logo=whatsapp&logoColor=white" alt="Chat on WhatsApp"/>
+</a>
+
+</div>
+
+- 🌐 **Website:** to get more info visit [https://annapurna.hawkaii.me](https://annapurna.hawkaii.me)
+- 🎬 **Demo:**
+  <div align="center">
+    <iframe width="420" height="236" src="https://www.youtube.com/embed/uxZUkDU_gno" title="Annapurna Demo" frameborder="0" allowfullscreen></iframe>
+  </div>
+
 
 Annapurna is a WhatsApp-based kitchen assistant powered by Puch AI and Gemini. It helps users manage their pantry, scan grocery bills, get smart recipe suggestions, and track nutrition—all through simple image and text interactions. This project is a Model Context Protocol (MCP) server starter, ready to connect with Puch AI and extend with your own tools.
 
